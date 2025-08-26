@@ -10,6 +10,41 @@ const { google } = require("googleapis");
 const app = express();
 app.use(cors());
 
+// ensure a subfolder under DRIVE_FOLDER_ID named `${Name}_${Email}`
+async function ensureCandidateFolder(drive, parentFolderId, nameRaw, emailRaw) {
+  const safe = (s) => (s || "").trim().replace(/[^\w.@-]+/g, "_").slice(0, 80);
+  const folderName = `${safe(nameRaw)}_${safe(emailRaw)}` || "Unknown_Candidate";
+
+  // search for existing folder
+  const q = [
+    `name='${folderName.replace(/'/g, "\\'")}'`,
+    `mimeType='application/vnd.google-apps.folder'`,
+    `'${parentFolderId}' in parents`,
+    "trashed=false"
+  ].join(" and ");
+
+  const list = await drive.files.list({
+    q,
+    fields: "files(id, name)",
+  });
+
+  if (list.data.files && list.data.files.length) {
+    return list.data.files[0].id;
+  }
+
+  // create if not exists
+  const created = await drive.files.create({
+    requestBody: {
+      name: folderName,
+      mimeType: "application/vnd.google-apps.folder",
+      parents: [parentFolderId],
+    },
+    fields: "id, name",
+  });
+  return created.data.id;
+}
+
+
 // --- TEMP LOCAL SAVE DIR ---
 const UPLOAD_DIR = path.join(__dirname, "uploads");
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -65,32 +100,61 @@ app.post("/upload", upload.single("file"), async (req, res) => {
     const filename = req.file.originalname || path.basename(localPath);
     const mimeType = req.file.mimetype || "video/webm";
 
+    const candidateName = (req.body.candidateName || "").trim();
+    const candidateEmail = (req.body.candidateEmail || "").trim();
+    const jobRole = (req.body.jobRole || "").trim();
+
     console.log("📥 /upload hit");
     console.log("   file:", filename);
     console.log("   saved:", localPath);
     console.log("   DRIVE_FOLDER_ID:", process.env.DRIVE_FOLDER_ID);
+    console.log("   candidate:", candidateName, candidateEmail, jobRole);
 
-    // ---- Upload to Google Drive ----
-    const driveFile = await uploadToDrive(localPath, filename, mimeType);
-    console.log("☁️  Drive upload OK:", driveFile.id);
+    // Get an authenticated Drive client (OAuth or service account as you already set up)
+    const drive = await getOAuthDrive?.() || getDrive(); // use whichever auth helper you kept
 
-    // Keep or remove local temp:
-    // Comment the next line OUT if you want to keep local copies in /uploads
+    // 1) ensure subfolder "<Name>_<Email>" under the main Joblens folder
+    const subFolderId = await ensureCandidateFolder(
+      drive,
+      process.env.DRIVE_FOLDER_ID,
+      candidateName,
+      candidateEmail
+    );
+
+    // 2) upload file into that subfolder
+    const created = await drive.files.create({
+      requestBody: { name: filename, parents: [subFolderId] },
+      media: { mimeType, body: fs.createReadStream(localPath) },
+      fields: "id,name,webViewLink,webContentLink",
+    });
+
+    // Make public link (optional; remove if you want private)
+    try {
+      await drive.permissions.create({
+        fileId: created.data.id,
+        requestBody: { role: "reader", type: "anyone" },
+      });
+    } catch (e) {
+      console.warn("Permission set failed (non-fatal):", e.message);
+    }
+
+    // cleanup local temp (comment out if you want to keep local copy)
     fs.unlink(localPath, () => {});
 
     return res.json({
       ok: true,
-      id: driveFile.id,
-      name: driveFile.name,
-      viewLink: driveFile.webViewLink,
-      downloadLink: driveFile.webContentLink,
-      // localUrl: `/uploads/${path.basename(localPath)}`, // only valid if you keep the file
+      id: created.data.id,
+      name: created.data.name,
+      viewLink: created.data.webViewLink,
+      downloadLink: created.data.webContentLink,
+      folderId: subFolderId,
     });
   } catch (e) {
     console.error("❌ Upload error:", e?.response?.data || e);
     return res.status(500).json({ ok: false, error: e.message || "Upload failed" });
   }
 });
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Backend listening on ${PORT}`));
