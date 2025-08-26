@@ -1,0 +1,9 @@
+# Ignore sensitive files and temp storage
+.env
+service-account.json
+token.json
+credentials.json
+uploads/
+node_modules/
+
+
