@@ -112,8 +112,8 @@
 .input:focus { border-color: #6d4bff; box-shadow: 0 0 0 3px rgba(109,75,255,.12); }
 
 .question-text{
-  margin-top: 14px;
-  padding: 16px 18px;           /* more padding top/bottom */
+  margin-top: 18px;
+  padding: 18px 18px;           /* more padding top/bottom */
   background: #f7f8fc;
   border: 1px solid #e6e9f2;
   border-radius: 12px;
@@ -122,5 +122,36 @@
   font-size: 1.1rem;            /* bigger */
   font-weight: 700;
   color: #2a2f45;
+}
+
+/* container to position mouth overlay */
+.avatar-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+/* subtle glow while speaking (optional) */
+.avatar-wrapper.speaking .avatar {
+  box-shadow: 0 12px 40px rgba(109,75,255,0.25);
+  transition: box-shadow .2s ease;
+}
+
+/* tune these to match your avatar image */
+/* use % so it stays in the right place at any avatar size */
+.mouth{
+  position:absolute;
+  left: var(--mouth-x, 50%);      /* horizontal center */
+  top:  var(--mouth-y, 38%);      /* << move this up/down */
+  width: var(--mouth-w, 50px);    /* mouth width */
+  height: var(--mouth-h, 10px);   /* closed height */
+  transform: translate(-50%, -50%);
+  background:#181818;
+  border-radius: 18px;
+  transition: height .12s ease, transform .12s ease, opacity .12s ease;
+  opacity:.95;
+}
+.mouth.open{
+  height: calc(var(--mouth-h,10px) * 1.6);   /* open height */
+  transform: translate(-50%, -50%) translateY(1px);
 }
 

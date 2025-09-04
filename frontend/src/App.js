@@ -9,7 +9,7 @@ const QUESTIONS = [
   "Where do you see yourself in five years?"
 ];
 
-const RECORD_SECONDS = 20; // set to 20 for testing
+const RECORD_SECONDS = 10; // set to 10 for testing
 const API_BASE = process.env.REACT_APP_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
 
 export default function App() {
@@ -29,25 +29,39 @@ export default function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(RECORD_SECONDS);
-  const [showNext, setShowNext] = useState(false); // ⬅️ show “Next question” after upload
+  const [showNext, setShowNext] = useState(false); // ⬅ show “Next question” after upload
   const [busy, setBusy] = useState(false); // <-- prevents double-trigger
+  const [mouthOpen, setMouthOpen] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const speak = (text) =>
     new Promise((resolve) => {
       const u = new SpeechSynthesisUtterance(text);
-      u.onend = resolve;
-      u.rate = 1; u.pitch = 1;
+  
+      // start/stop indicators
+      u.onstart = () => {
+        setIsSpeaking(true);
+        setMouthOpen(true);
+      };
+      u.onend = () => {
+        setMouthOpen(false);
+        setIsSpeaking(false);
+        resolve();
+      };
+  
+      // flap on boundaries (words/phonemes)
+      u.onboundary = () => {
+        setMouthOpen(true);
+        // brief close after 120ms (simple flap)
+        clearTimeout(speak._t);
+        speak._t = setTimeout(() => setMouthOpen(false), 120);
+      };
+  
+      // safety: cancel any queued speech first
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(u);
     });
-
-  const prepareStream = async () => {
-    if (!streamRef.current) {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-    }
-  };
+  
 
   const mmss = (s) => {
     const m = Math.floor(s / 60).toString().padStart(2, "0");
@@ -69,7 +83,7 @@ export default function App() {
     return data;
   };
 
-  const startRecorder = () =>
+  const startRecorder = (currentIndex) =>
     new Promise((resolveStart) => {
       const chunks = [];
       const mr = new MediaRecorder(streamRef.current, { mimeType: "video/webm" });
@@ -78,7 +92,7 @@ export default function App() {
       mr.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
       mr.onstop = async () => {
         const blob = new Blob(chunks, { type: "video/webm" });
-        const fname = `answer_q${qIndex + 1}.webm`;
+        const fname = `answer_q${currentIndex + 1}.webm`;
         try {
           await uploadRecording(blob, fname);
         } catch (e) {
@@ -132,6 +146,19 @@ export default function App() {
     }
   };
 
+  // ADD: prepare the camera+mic stream once
+  const prepareStream = async () => {
+    if (!streamRef.current) {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true
+      });
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    }
+  };
+
+
   // 🟡 Ask current question, then auto-record. After stop+upload, we DO NOT auto-advance.
   const askCurrentQuestionThenRecord = async (idx) => {
       if (busy) return;          // <-- guard: do nothing if already in-flight
@@ -141,7 +168,7 @@ export default function App() {
         window.speechSynthesis.cancel(); // safety: clear any queued speech
         const text = QUESTIONS[idx ?? qIndex];
         await speak(text);
-        await startRecorder();
+        await startRecorder(idx);
       } finally {
         setBusy(false);
       }
@@ -179,20 +206,43 @@ export default function App() {
     return () => {
       try {
         window.speechSynthesis.cancel();
-        clearInterval(countdownRef.current);
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-          mediaRecorderRef.current.stop();
+  
+        // cache refs at cleanup start
+        const mr = mediaRecorderRef.current;
+        const stream = streamRef.current;
+  
+        if (mr && mr.state !== "inactive") {
+          mr.stop();
         }
-        if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+        if (stream) {
+          stream.getTracks().forEach((t) => t.stop());
+        }
+  
+        clearInterval(countdownRef.current);
+        setMouthOpen?.(false);
+        setIsSpeaking?.(false);
       } catch {}
     };
-  }, []);
+  }, []); // keep dependency array empty for unmount cleanup
+  
 
   return (
     <div className="page">
       {/* LEFT: Avatar + controls or Form */}
       <div className="left">
-        <img src="/interviewer.png" alt="HR Avatar" className="avatar" />
+      <div className={`avatar-wrapper ${isSpeaking ? "speaking" : ""}`}
+      /* tune these numbers to hit the exact spot */
+         style={{
+          "--mouth-x": "50%",   // center horizontally
+          "--mouth-y": "39%",   // move up/down to the “arrowed” spot
+          "--mouth-w": "50px",  // width
+          "--mouth-h": "10px"   // closed height
+     }}>
+  <img src="/interviewer.png" alt="HR Avatar" className="avatar" />
+  <div className={`mouth ${mouthOpen ? "open" : ""}`} />
+</div>
+
+
 
         {/* === Candidate Form === */}
         {phase === "form" && (
