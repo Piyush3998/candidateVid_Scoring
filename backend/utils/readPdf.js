@@ -1,22 +1,46 @@
+import pdfParse from "pdf-parse";
 import fs from "fs";
-import pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
 
-export const readPdfText = async (filePath) => {
-  if (!fs.existsSync(filePath)) {
-    throw new Error("PDF file not found: " + filePath);
+export const readPdfText = async (fileBuffer) => {
+  try {
+    const data = await pdfParse(fileBuffer);
+    return (data?.text || "")
+      .replace(/\r\n/g, "\n")
+      .replace(/\s+/g, " ")
+      .trim();
+  } catch (err) {
+    console.error("Error parsing PDF:", err.message || err);
+    return "";
   }
+};
 
-  const data = new Uint8Array(fs.readFileSync(filePath));
-  const pdf = await pdfjsLib.getDocument({ data }).promise;
-
-  let textContent = "";
-
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const pageText = content.items.map((item) => item.str).join(" ");
-    textContent += pageText + "\n";
+// ------------------------------
+// Read plain text file
+// ------------------------------
+export const readTxtFromPath = async (filePath) => {
+  try {
+    if (!fs.existsSync(filePath)) {
+      console.warn(`Text file not found: ${filePath}`);
+      return "";
+    }
+    const text = await fs.promises.readFile(filePath, "utf8");
+    return text.replace(/\r\n/g, "\n").replace(/\s+/g, " ").trim();
+  } catch (err) {
+    console.error("Error reading TXT file:", err.message || err);
+    return "";
   }
+};
 
-  return textContent.trim();
+export const readPdfFromPath = async (filePath) => {
+  try {
+    if (!fs.existsSync(filePath)) {
+      console.warn(`File not found: ${filePath}`);
+      return "";
+    }
+    const buffer = await fs.promises.readFile(filePath);
+    return await readPdfText(buffer);
+  } catch (err) {
+    console.error("Error reading PDF file:", err.message || err);
+    return "";
+  }
 };

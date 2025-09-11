@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import CVUpload from "../model/Cv.js";
 
-// Upload multiple CVs
+// Upload multiple CVs safely
 export const createCVsCtrl = asyncHandler(async (req, res) => {
   const files = req.files;
   if (!files || files.length === 0) {
@@ -15,12 +15,15 @@ export const createCVsCtrl = asyncHandler(async (req, res) => {
   const savedCVs = [];
 
   for (let file of files) {
+    // Check if originalName already exists in DB
     const exists = await CVUpload.findOne({ originalName: file.originalname });
     if (exists) {
-      fs.unlinkSync(path.join(file.path)); // delete duplicate
+      // Delete duplicate file safely
+      if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
       continue;
     }
 
+    // Save CV to DB
     const cv = await CVUpload.create({
       filename: file.filename,
       originalName: file.originalname,
@@ -54,5 +57,29 @@ export const getAllCVsCtrl = asyncHandler(async (req, res) => {
     status: "success",
     total: cvs.length,
     files: filesWithLinks,
+  });
+});
+
+// ------------------------------
+// Delete all CVs
+// ------------------------------
+export const deleteAllCVsCtrl = asyncHandler(async (req, res) => {
+  // Fetch all CV entries from DB
+  const allCVs = await CVUpload.find();
+
+  // Delete files from filesystem
+  for (let cv of allCVs) {
+    const filePath = path.join("uploads", cv.filename); // adjust 'uploads' if your folder is different
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
+
+  // Remove all records from DB
+  await CVUpload.deleteMany();
+
+  res.status(200).json({
+    status: "success",
+    message: `${allCVs.length} CVs deleted successfully`,
   });
 });

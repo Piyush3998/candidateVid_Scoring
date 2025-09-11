@@ -5,7 +5,7 @@ const cvSchema = new mongoose.Schema(
     filename: {
       type: String,
       required: true,
-      unique: true, // ensures no duplicate filenames in DB
+      // unique: true, // remove this
     },
     originalName: {
       type: String,

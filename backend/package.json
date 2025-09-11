@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "server": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "postinstall": "patch-package"
   },
   "keywords": [
     "API",
@@ -21,15 +22,18 @@
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "express-async-handler": "^1.2.0",
+    "file-type": "^21.0.0",
     "fs": "^0.0.1-security",
     "googleapis": "^156.0.0",
     "jsonwebtoken": "^9.0.2",
     "mammoth": "^1.10.0",
     "mongoose": "^8.18.0",
     "multer": "^2.0.2",
+    "patch-package": "^8.0.0",
     "path": "^0.12.7",
     "pdf-parse": "^1.1.1",
     "pdfjs-dist": "^5.4.149",
+    "string-similarity": "^4.0.4",
     "tesseract.js": "^6.0.1",
     "textract": "^2.5.0",
     "xlsx": "^0.18.5"
