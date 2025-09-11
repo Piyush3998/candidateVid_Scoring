@@ -5,12 +5,20 @@ import multer from "multer";
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
+dotenv.config();
 import { google } from "googleapis";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import { getOAuthDrive } from "./driveAuth.js"; // ✅ ESM import
+import dbConnect from "../config/dbConnect.js";
+import { globalErrhandler, notFound } from "../middleware/globalErrHandler.js";
+import userRoutes from "../routes/userRoute.js";
+import jobDescRoutes from "../routes/jobDescRoute.js";
+import cvRoutes from "../routes/cvRoute.js";
+import scoreRoute from "../routes/cvRankingRoute.js";
 
-dotenv.config();
+// dbConnect
+dbConnect();
 
 // __dirname replacement for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -18,6 +26,18 @@ const __dirname = dirname(__filename);
 
 const app = express();
 app.use(cors());
+// middleware - pass incoming data
+app.use(express.json());
+
+// routes
+app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/jobDesc", jobDescRoutes);
+app.use("/api/v1/cv", cvRoutes);
+app.use("/api/v1/score", scoreRoute);
+
+// err middleware
+app.use(notFound);
+app.use(globalErrhandler);
 
 // --- Ensure candidate folder in Drive ---
 async function ensureCandidateFolder(drive, parentFolderId, nameRaw, emailRaw) {
