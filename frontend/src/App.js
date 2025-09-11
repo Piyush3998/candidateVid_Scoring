@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./App.css";
 
+const AVATAR_IMG = "/didinterviewer.png"; // lives in frontend/public/
+const AVATAR_IDLE_LOOP = ""; 
+
 const QUESTIONS = [
   "Tell me about yourself.",
   "What are your strengths and weaknesses?",
@@ -9,8 +12,8 @@ const QUESTIONS = [
   "Where do you see yourself in five years?"
 ];
 
-const RECORD_SECONDS = 10; // set to 10 for testing
-const API_BASE = process.env.REACT_APP_API_URL?.replace(/\/$/, "") || "http://localhost:5000";
+const RECORD_SECONDS = 10; // test
+const API_BASE = process.env.REACT_APP_API_URL?.replace(/\/$/, "") || ""; // with CRA proxy, "" hits localhost:3000 -> proxied to 5000
 
 export default function App() {
   // --- candidate form state ---
@@ -24,44 +27,47 @@ export default function App() {
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const countdownRef = useRef(null);
+  const avatarWrapperRef = useRef(null);
 
   const [qIndex, setQIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(RECORD_SECONDS);
-  const [showNext, setShowNext] = useState(false); // ⬅ show “Next question” after upload
-  const [busy, setBusy] = useState(false); // <-- prevents double-trigger
-  const [mouthOpen, setMouthOpen] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [showNext, setShowNext] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const speak = (text) =>
-    new Promise((resolve) => {
-      const u = new SpeechSynthesisUtterance(text);
-  
-      // start/stop indicators
-      u.onstart = () => {
-        setIsSpeaking(true);
-        setMouthOpen(true);
-      };
-      u.onend = () => {
-        setMouthOpen(false);
-        setIsSpeaking(false);
-        resolve();
-      };
-  
-      // flap on boundaries (words/phonemes)
-      u.onboundary = () => {
-        setMouthOpen(true);
-        // brief close after 120ms (simple flap)
-        clearTimeout(speak._t);
-        speak._t = setTimeout(() => setMouthOpen(false), 120);
-      };
-  
-      // safety: cancel any queued speech first
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
-    });
-  
+  const [avatarVideoMode, setAvatarVideoMode] = useState(false);
+
+  const [avatarVideoUrl, setAvatarVideoUrl] = useState(null);
+  const avatarVideoRef = useRef(null);
+
+
+  // prepare camera+mic
+  const prepareStream = async () => {
+    if (!streamRef.current) {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    }
+  };
+
+  // D-ID request + play the returned video in avatar slot
+  async function playAvatarFor(text) {
+     const r = await fetch(`${API_BASE}/avatar/talk?text=${encodeURIComponent(text)}`);
+       const data = await r.json();
+       if (!data.ok || !data.url) throw new Error(data.error || "avatar failed");
+       setAvatarVideoMode(true);
+       setAvatarVideoUrl(data.url);
+       return new Promise((resolve) => {
+         const waitForVideo = () => {
+           const v = avatarVideoRef.current;
+           if (!v) return requestAnimationFrame(waitForVideo);
+           v.onended = () => { setAvatarVideoUrl(null); setAvatarVideoMode(false); resolve(); };
+           v.oncanplay = () => v.play().catch(() => {});
+         };
+         waitForVideo();
+       });
+     }
 
   const mmss = (s) => {
     const m = Math.floor(s / 60).toString().padStart(2, "0");
@@ -72,22 +78,40 @@ export default function App() {
   const uploadRecording = async (blob, filename) => {
     const form = new FormData();
     form.append("file", blob, filename);
-    // send candidate metadata so backend can route to subfolder
     form.append("candidateName", candidateName.trim());
     form.append("candidateEmail", candidateEmail.trim());
     form.append("jobRole", jobRole.trim());
     const res = await fetch(`${API_BASE}/upload`, { method: "POST", body: form });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data?.ok) throw new Error(data?.error || `Upload failed`);
-    console.log("Uploaded →", data.viewLink || data.downloadLink || data.path);
+    console.log("Uploaded →", data.path || data.viewLink || data.downloadLink);
     return data;
   };
 
   const startRecorder = (currentIndex) =>
     new Promise((resolveStart) => {
       const chunks = [];
-      const mr = new MediaRecorder(streamRef.current, { mimeType: "video/webm" });
-      mediaRecorderRef.current = mr;
+      if (!streamRef.current || !streamRef.current.getTracks().length) {
+       throw new Error("No media stream available");
+       }
+       let options;
+       try {
+         if (window.MediaRecorder && MediaRecorder.isTypeSupported) {
+           if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9")) {
+             options = { mimeType: "video/webm;codecs=vp9" };
+           } else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8")) {
+             options = { mimeType: "video/webm;codecs=vp8" };
+           } else if (MediaRecorder.isTypeSupported("video/webm")) {
+             options = { mimeType: "video/webm" };
+           }
+         }
+       } catch {}
+      const mr = options ? new MediaRecorder(streamRef.current, options) : new MediaRecorder(streamRef.current);
+
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+         try { mediaRecorderRef.current.stop(); } catch {}
+       }
+        
 
       mr.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
       mr.onstop = async () => {
@@ -99,7 +123,6 @@ export default function App() {
           console.error(e);
           alert("Upload failed. Check backend logs.");
         }
-        // when upload done, show “Next question” button
         setShowNext(true);
         resolveStart();
       };
@@ -146,37 +169,25 @@ export default function App() {
     }
   };
 
-  // ADD: prepare the camera+mic stream once
-  const prepareStream = async () => {
-    if (!streamRef.current) {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
-      streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
+  // Ask current question via D-ID avatar video, then record
+  const askCurrentQuestionThenRecord = async (idx) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await prepareStream();
+      window.speechSynthesis.cancel(); // ensure browser TTS queue is clear
+      const text = QUESTIONS[idx ?? qIndex];
+
+      await playAvatarFor(text);           // <-- speak via D-ID video
+      await startRecorder(idx);            // <-- then capture the answer
+    } finally {
+      setBusy(false);
     }
   };
 
-
-  // 🟡 Ask current question, then auto-record. After stop+upload, we DO NOT auto-advance.
-  const askCurrentQuestionThenRecord = async (idx) => {
-      if (busy) return;          // <-- guard: do nothing if already in-flight
-      setBusy(true);
-      try {
-        await prepareStream();
-        window.speechSynthesis.cancel(); // safety: clear any queued speech
-        const text = QUESTIONS[idx ?? qIndex];
-        await speak(text);
-        await startRecorder(idx);
-      } finally {
-        setBusy(false);
-      }
-    };
-
   const onNextQuestion = async () => {
     const next = qIndex + 1;
-     if (next < QUESTIONS.length) {
+    if (next < QUESTIONS.length) {
       setQIndex(next);
       setShowNext(false);
       await askCurrentQuestionThenRecord(next);
@@ -193,7 +204,6 @@ export default function App() {
       alert("Please fill Name, Email, and Job Role.");
       return;
     }
-    // very light email check
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidateEmail.trim())) {
       alert("Enter a valid email.");
       return;
@@ -206,108 +216,108 @@ export default function App() {
     return () => {
       try {
         window.speechSynthesis.cancel();
-  
-        // cache refs at cleanup start
         const mr = mediaRecorderRef.current;
         const stream = streamRef.current;
-  
-        if (mr && mr.state !== "inactive") {
-          mr.stop();
-        }
-        if (stream) {
-          stream.getTracks().forEach((t) => t.stop());
-        }
-  
+        if (mr && mr.state !== "inactive") mr.stop();
+        if (stream) stream.getTracks().forEach((t) => t.stop());
         clearInterval(countdownRef.current);
-        setMouthOpen?.(false);
-        setIsSpeaking?.(false);
+        setAvatarVideoMode(false);
+        setAvatarVideoUrl(null);
       } catch {}
     };
-  }, []); // keep dependency array empty for unmount cleanup
-  
+  }, []);
 
   return (
     <div className="page">
       {/* LEFT: Avatar + controls or Form */}
       <div className="left">
-      <div className={`avatar-wrapper ${isSpeaking ? "speaking" : ""}`}
-      /* tune these numbers to hit the exact spot */
-         style={{
-          "--mouth-x": "50%",   // center horizontally
-          "--mouth-y": "39%",   // move up/down to the “arrowed” spot
-          "--mouth-w": "50px",  // width
-          "--mouth-h": "10px"   // closed height
-     }}>
-  <img src="/interviewer.png" alt="HR Avatar" className="avatar" />
-  <div className={`mouth ${mouthOpen ? "open" : ""}`} />
-</div>
+        <div
+          ref={avatarWrapperRef}
+          className="avatar-wrapper"
+        >
+          {avatarVideoUrl ? (
+            // During ASKING (D-ID video)
+            <video
+              ref={avatarVideoRef}
+              src={avatarVideoUrl}
+              autoPlay
+              playsInline
+              className="avatar portrait"
+            />
+          ) : isRecording ? (
+            // During ANSWERING (neutral idle)
+            AVATAR_IDLE_LOOP ? (
+              <video
+                src={AVATAR_IDLE_LOOP}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="avatar portrait"
+              />
+            ) : (
+              <img
+                src={AVATAR_IMG}
+                alt="HR Avatar"
+                className="avatar portrait idle"
+              />
+            )
+          ) : (
+            // Idle (before start / between screens)
+            <img
+              src={AVATAR_IMG}
+              alt="HR Avatar"
+              className="avatar portrait"
+            />
+          )}
+      </div>
 
-
-
-        {/* === Candidate Form === */}
         {phase === "form" && (
-          <form className="card" onSubmit={onSubmitForm} style={{minWidth: 320}}>
-            <h2 style={{marginBottom: 12}}>Candidate Details</h2>
-            <input
-              className="input"
-              placeholder="Name"
-              value={candidateName}
-              onChange={(e) => setCandidateName(e.target.value)}
-            />
-            <input
-              className="input"
-              placeholder="Email"
-              value={candidateEmail}
-              onChange={(e) => setCandidateEmail(e.target.value)}
-              type="email"
-            />
-            <input
-              className="input"
-              placeholder="Job role"
-              value={jobRole}
-              onChange={(e) => setJobRole(e.target.value)}
-            />
-            <button className="primary" type="submit" style={{marginTop: 10}}>
-              Continue
-            </button>
+          <form className="card" onSubmit={onSubmitForm} style={{ minWidth: 320 }}>
+            <h2 style={{ marginBottom: 12 }}>Candidate Details</h2>
+            <input className="input" placeholder="Name" value={candidateName}
+              onChange={(e) => setCandidateName(e.target.value)} />
+            <input className="input" placeholder="Email" type="email" value={candidateEmail}
+              onChange={(e) => setCandidateEmail(e.target.value)} />
+            <input className="input" placeholder="Job role" value={jobRole}
+              onChange={(e) => setJobRole(e.target.value)} />
+            <button className="primary" type="submit" style={{ marginTop: 10 }}>Continue</button>
           </form>
         )}
 
-        {/* === Start button after form === */}
         {phase === "idle" && (
           <button className="primary" onClick={async () => {
             setPhase("running");
             setQIndex(0);
-            setShowNext(false); 
-            await askCurrentQuestionThenRecord(0);
-            // First question will only start when user clicks "Next Question"
+            setShowNext(false);
+            await askCurrentQuestionThenRecord(0);  // auto-start Q1
           }}>
             Start Interview
           </button>
         )}
 
-        {/* === During interview === */}
         {phase === "running" && (
           <>
             <div className="question-count">Question {qIndex + 1} / {QUESTIONS.length}</div>
-            <div classname="question-text">{QUESTIONS[qIndex]}</div>
+            <div className="question-text">{QUESTIONS[qIndex]}</div>
             <div className="timer" data-live={isRecording && !isPaused}>⏳ {mmss(secondsLeft)}</div>
+
             {!showNext && (
               <div className="record-pill" data-on={isRecording}>
                 {isRecording ? (isPaused ? "Resume" : "Recording...") : "Processing..."}
-              </div>)}
-            {/* show controls ONLY while recording and BEFORE Next appears */}
-            {isRecording && !showNext && (
-            <div className="controls">
-            <button className="secondary" onClick={handlePauseResume}>
-              {isPaused ? "Resume" : "Pause"}
-            </button>
-            </div>
-        )}
+              </div>
+            )}
 
-            {/* Show Next only AFTER upload completes */}
+            {isRecording && !showNext && (
+              <div className="controls">
+                <button className="secondary" onClick={handlePauseResume}>
+                  {isPaused ? "Resume" : "Pause"}
+                </button>
+              </div>
+            )}
+
             {showNext && (
-              <button className="primary" style={{marginTop: 12}} onClick={onNextQuestion}>
+              <button className="primary" style={{ marginTop: 12 }} onClick={onNextQuestion}>
                 {qIndex < QUESTIONS.length - 1 ? "Next Question" : "Finish Interview"}
               </button>
             )}
@@ -315,9 +325,7 @@ export default function App() {
         )}
 
         {phase === "done" && (
-          <div className="done-box">
-            ✅ Interview complete. Responses uploaded.
-          </div>
+          <div className="done-box">✅ Interview complete. Responses uploaded.</div>
         )}
       </div>
 

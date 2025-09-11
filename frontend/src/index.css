@@ -11,3 +11,25 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+.avatar-wrapper { position: relative; display: inline-block; }
+.avatar-wrapper.speaking .avatar { box-shadow: 0 12px 40px rgba(109,75,255,0.25); transition: box-shadow .2s; }
+
+.mouth{
+  position:absolute;
+  left: var(--mouth-x, 50%);
+  top:  var(--mouth-y, 60%);
+  width: var(--mouth-w, 54px);
+  height: var(--mouth-h, 12px);
+  transform: translate(-50%, -50%);
+  background:#181818; border-radius:18px; opacity:.95;
+  transition: height .12s ease, transform .12s ease, opacity .12s ease;
+}
+.mouth.open{ height: calc(var(--mouth-h,12px) * 2.6); transform: translate(-50%, -50%) translateY(2px); }
+
+.question-text{
+  margin-top:14px; padding:16px 18px;
+  background:#f7f8fc; border:1px solid #e6e9f2; border-radius:12px;
+  max-width:640px; text-align:center; font-size:1.1rem; font-weight:700; color:#2a2f45;
+}
+

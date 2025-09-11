@@ -136,22 +136,28 @@
   transition: box-shadow .2s ease;
 }
 
-/* tune these to match your avatar image */
-/* use % so it stays in the right place at any avatar size */
-.mouth{
-  position:absolute;
-  left: var(--mouth-x, 50%);      /* horizontal center */
-  top:  var(--mouth-y, 38%);      /* << move this up/down */
-  width: var(--mouth-w, 50px);    /* mouth width */
-  height: var(--mouth-h, 10px);   /* closed height */
-  transform: translate(-50%, -50%);
-  background:#181818;
-  border-radius: 18px;
-  transition: height .12s ease, transform .12s ease, opacity .12s ease;
-  opacity:.95;
-}
-.mouth.open{
-  height: calc(var(--mouth-h,10px) * 1.6);   /* open height */
-  transform: translate(-50%, -50%) translateY(1px);
+/* Keep the avatar in a portrait frame */
+.avatar.portrait {
+  width: 320px;           /* adjust to taste */
+  height: 420px;          /* portrait shape */
+  object-fit: cover;
+  border-radius: 16px;
+  display: block;
 }
 
+/* Subtle ‘alive’ state during candidate answering (image fallback) */
+.avatar.idle {
+  animation: breathe 3s ease-in-out infinite;
+  filter: contrast(1.02) saturate(1.02);
+}
+
+@keyframes breathe {
+  0%   { transform: scale(1.000) translateY(0px); }
+  50%  { transform: scale(1.008) translateY(-1px); }
+  100% { transform: scale(1.000) translateY(0px); }
+}
+
+/* Optional: small glow while asking (applies to <video> too if wrapper gets a class) */
+.avatar-wrapper .avatar {
+  box-shadow: 0 8px 28px rgba(40, 75, 255, 0.12);
+}
