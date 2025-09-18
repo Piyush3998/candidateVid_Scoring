@@ -1,0 +1,44 @@
+Job Title: Full-Stack Software Developer (React, React Native, Python, Data Science)
+
+Location: Sydney, Australia
+
+About the Role
+We are seeking a results-driven software developer with strong expertise in full-stack development and a passion for building scalable digital products. The successful candidate will work on cross-platform applications and data-driven projects, contributing to both frontend and backend solutions while collaborating in Agile teams.
+
+Key Responsibilities
+
+Develop and maintain cross-platform applications using React.js and React Native
+
+Design and implement responsive user interfaces with JavaScript, TypeScript, Redux, HTML, CSS, Tailwind, and Bootstrap
+
+Integrate and optimize RESTful APIs for secure backend communication
+
+Work with SQL and Python to manage and analyze data
+
+Collaborate on UI/UX design using Figma, Photoshop, and Adobe Suite
+
+Maintain websites with WordPress and implement SEO best practices using Google Search Console
+
+Use Git/GitHub for version control and participate in code reviews
+
+Work in Agile/Scrum teams, using Jira for sprint planning and project tracking
+
+Optimize application performance and ensure pixel-perfect UI/UX delivery
+
+Troubleshoot and debug applications efficiently
+
+Qualifications
+
+Master of Data Science (Charles Darwin University, Australia)
+
+Bachelor of Computer Science (University of Wolverhampton, UK)
+
+Desired Skills
+
+Strong knowledge of Microsoft 365, Canva, and digital marketing tools
+
+Experience in SEO optimization and website performance improvement
+
+Ability to work collaboratively in cross-functional teams
+
+Excellent problem-solving skills and a proven track record of delivering results

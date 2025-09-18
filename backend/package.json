@@ -2,18 +2,44 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "server": "nodemon server.js",
+    "start": "node server.js",
+    "postinstall": "patch-package"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "API",
+    "NodeJS"
+  ],
+  "author": "Shiva Giri",
   "license": "ISC",
   "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "compromise": "^14.14.4",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.2",
+    "dotenv": "^17.2.1",
     "express": "^5.1.0",
+    "express-async-handler": "^1.2.0",
+    "file-type": "^21.0.0",
+    "fs": "^0.0.1-security",
     "googleapis": "^156.0.0",
-    "multer": "^2.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "mammoth": "^1.10.0",
+    "mongoose": "^8.18.0",
+    "multer": "^2.0.2",
+    "patch-package": "^8.0.0",
+    "path": "^0.12.7",
+    "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "^5.4.149",
+    "string-similarity": "^4.0.4",
+    "tesseract.js": "^6.0.1",
+    "textract": "^2.5.0",
+    "uuid": "^13.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   }
 }
