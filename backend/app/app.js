@@ -16,6 +16,7 @@ import userRoutes from "../routes/userRoute.js";
 import jobDescRoutes from "../routes/jobDescRoute.js";
 import cvRoutes from "../routes/cvRoute.js";
 import scoreRoute from "../routes/cvRankingRoute.js";
+import numberRoute from "../routes/numberRoute.js";
 
 // dbConnect
 dbConnect();
@@ -34,6 +35,7 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/jobDesc", jobDescRoutes);
 app.use("/api/v1/cv", cvRoutes);
 app.use("/api/v1/score", scoreRoute);
+app.use("/api/v1/ats", numberRoute);
 
 // err middleware
 app.use(notFound);

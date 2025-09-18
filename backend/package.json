@@ -36,6 +36,7 @@
     "string-similarity": "^4.0.4",
     "tesseract.js": "^6.0.1",
     "textract": "^2.5.0",
+    "uuid": "^13.0.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
